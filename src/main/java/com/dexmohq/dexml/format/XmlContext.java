@@ -10,10 +10,7 @@ import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -38,34 +35,51 @@ public class XmlContext {
         this.climbHierarchy = climbHierarchy;
         // register primitives
         registerFormat(Integer.class, PrimitiveFormats.INT_FORMAT);
-        registerFormat(Integer.TYPE, PrimitiveFormats.INT_FORMAT);
+        registerFormat(int.class, PrimitiveFormats.INT_FORMAT);
         registerFormat(Long.class, PrimitiveFormats.LONG_FORMAT);
-        registerFormat(Long.TYPE, PrimitiveFormats.LONG_FORMAT);
+        registerFormat(long.class, PrimitiveFormats.LONG_FORMAT);
         registerFormat(Boolean.class, PrimitiveFormats.BOOLEAN_FORMAT);
-        registerFormat(Boolean.TYPE, PrimitiveFormats.BOOLEAN_FORMAT);
+        registerFormat(boolean.class, PrimitiveFormats.BOOLEAN_FORMAT);
         registerFormat(Double.class, PrimitiveFormats.DOUBLE_FORMAT);
-        registerFormat(Double.TYPE, PrimitiveFormats.DOUBLE_FORMAT);
+        registerFormat(double.class, PrimitiveFormats.DOUBLE_FORMAT);
         registerFormat(Float.class, PrimitiveFormats.FLOAT_FORMAT);
-        registerFormat(Float.TYPE, PrimitiveFormats.FLOAT_FORMAT);
+        registerFormat(float.class, PrimitiveFormats.FLOAT_FORMAT);
         registerFormat(Character.class, PrimitiveFormats.CHARACTER_FORMAT);
-        registerFormat(Character.TYPE, PrimitiveFormats.CHARACTER_FORMAT);
+        registerFormat(char.class, PrimitiveFormats.CHARACTER_FORMAT);
         registerFormat(Byte.class, PrimitiveFormats.BYTE_FORMAT);
-        registerFormat(Byte.TYPE, PrimitiveFormats.BYTE_FORMAT);
+        registerFormat(byte.class, PrimitiveFormats.BYTE_FORMAT);
         registerFormat(Short.class, PrimitiveFormats.SHORT_FORMAT);
-        registerFormat(Short.TYPE, PrimitiveFormats.SHORT_FORMAT);
+        registerFormat(short.class, PrimitiveFormats.SHORT_FORMAT);
         //register default formats
         registerFormat(String.class, STRING_FORMAT);
         registerFormat(BigDecimal.class, BIG_DECIMAL_FORMAT);
         registerFormat(BigInteger.class, BIG_INTEGER_FORMAT);
         registerFormat(Date.class, UTIL_DATE_MILLIS_FORMAT);
-        registerFormat(LocalDateTime.class, LOCAL_DATE_TIME_MILLIS_FORMAT);
+        registerFormat(LocalDateTime.class, LOCAL_DATE_TIME_MILLIS_FORMAT);//todo nano time?
+        registerFormat(LocalDate.class, LOCAL_DATE_MILLIS_FORMAT);
+        registerFormat(LocalTime.class, LOCAL_TIME_MILLIS_FORMAT);
         registerFormat(java.sql.Timestamp.class, SQL_TIMESTAMP_MILLIS_FORMAT);
         registerFormat(java.sql.Date.class, SQL_DATE_MILLIS_FORMAT);
         registerFormat(java.sql.Time.class, SQL_TIME_MILLIS_FORMAT);
     }
 
+    public static XmlContext newDefault(boolean climbHierarchy) {
+        return new XmlContext(climbHierarchy);
+    }
+
     public static XmlContext newDefault() {
-        return new XmlContext(false);
+        return newDefault(false);
+    }
+
+    public XmlContext isoDateTimeFormatting() {
+        registerFormat(Date.class, UTIL_DATE_ISO_FORMAT);
+        registerFormat(LocalDateTime.class, LOCAL_DATE_TIME_ISO_FORMAT);
+        registerFormat(LocalDate.class, LOCAL_DATE_ISO_FORMAT);
+        registerFormat(LocalTime.class, LOCAL_TIME_ISO_FORMAT);
+        registerFormat(java.sql.Timestamp.class, SQL_TIMESTAMP_ISO_FORMAT);
+        registerFormat(java.sql.Date.class, SQL_DATE_ISO_FORMAT);
+        registerFormat(java.sql.Time.class, SQL_TIME_ISO_FORMAT);
+        return this;
     }
 
     @SuppressWarnings("unchecked")
@@ -299,15 +313,31 @@ public class XmlContext {
         }
     };
 
-    private static final XmlFormat<Date> UTIL_DATE_MILLIS_FORMAT = new XmlFormat<Date>() {
+    public static abstract class XmlFormatAsLong<T> implements XmlFormat<T> {
+        public abstract long toLong(T t);
+
+        public abstract T fromLong(long l);
+
         @Override
-        public Date read(String s) {
-            return new Date(Long.parseLong(s));
+        public T read(String s) {
+            return fromLong(Long.parseLong(s));
         }
 
         @Override
-        public String write(Date date) {
-            return Long.toString(date.getTime());
+        public String write(T t) {
+            return Long.toString(toLong(t));
+        }
+    }
+
+    private static final XmlFormat<Date> UTIL_DATE_MILLIS_FORMAT = new XmlFormatAsLong<Date>() {
+        @Override
+        public long toLong(Date date) {
+            return date.getTime();
+        }
+
+        @Override
+        public Date fromLong(long l) {
+            return new Date(l);
         }
     };
 
@@ -338,15 +368,15 @@ public class XmlContext {
 
     private static final ZoneId UTC_ZONE_ID = ZoneId.of("UTC");
 
-    private static final XmlFormat<LocalDateTime> LOCAL_DATE_TIME_MILLIS_FORMAT = new XmlFormat<LocalDateTime>() {
+    private static final XmlFormat<LocalDateTime> LOCAL_DATE_TIME_MILLIS_FORMAT = new XmlFormatAsLong<LocalDateTime>() {
         @Override
-        public LocalDateTime read(String s) {
-            return Instant.ofEpochMilli(Long.parseLong(s)).atZone(UTC_ZONE_ID).toLocalDateTime();
+        public LocalDateTime fromLong(long l) {
+            return Instant.ofEpochMilli(l).atZone(UTC_ZONE_ID).toLocalDateTime();
         }
 
         @Override
-        public String write(LocalDateTime localDateTime) {
-            return Long.toString(localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli());
+        public long toLong(LocalDateTime localDateTime) {
+            return localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli();
         }
     };
 
@@ -362,41 +392,124 @@ public class XmlContext {
         }
     };
 
-    //java time Date & Time
-
-    private static final XmlFormat<java.sql.Timestamp> SQL_TIMESTAMP_MILLIS_FORMAT = new XmlFormat<Timestamp>() {
+    private static final XmlFormat<java.time.LocalDate> LOCAL_DATE_MILLIS_FORMAT = new XmlFormatAsLong<LocalDate>() {
         @Override
-        public Timestamp read(String s) {
-            return new Timestamp(Long.parseLong(s));
+        public long toLong(LocalDate localDate) {
+            return localDate.toEpochDay();
         }
 
         @Override
-        public String write(Timestamp timestamp) {
-            return Long.toString(timestamp.getTime());
+        public LocalDate fromLong(long l) {
+            return LocalDate.ofEpochDay(l);
         }
     };
 
-    private static final XmlFormat<java.sql.Date> SQL_DATE_MILLIS_FORMAT = new XmlFormat<java.sql.Date>() {
+    private static final XmlFormat<LocalDate> LOCAL_DATE_ISO_FORMAT = new XmlFormat<LocalDate>() {
+        @Override
+        public LocalDate read(String s) {
+            return LocalDate.parse(s);
+        }
+
+        @Override
+        public String write(LocalDate localDate) {
+            return DateTimeFormatter.ISO_LOCAL_DATE.format(localDate);
+        }
+    };
+
+    private static final XmlFormat<java.time.LocalTime> LOCAL_TIME_MILLIS_FORMAT = new XmlFormatAsLong<LocalTime>() {
+        @Override
+        public long toLong(LocalTime localTime) {
+            return localTime.toNanoOfDay();
+        }
+
+        @Override
+        public LocalTime fromLong(long l) {
+            return LocalTime.ofNanoOfDay(l);
+        }
+    };
+
+    private static final XmlFormat<LocalTime> LOCAL_TIME_ISO_FORMAT = new XmlFormat<LocalTime>() {
+        @Override
+        public LocalTime read(String s) {
+            return LocalTime.parse(s);
+        }
+
+        @Override
+        public String write(LocalTime localTime) {
+            return DateTimeFormatter.ISO_LOCAL_TIME.format(localTime);
+        }
+    };
+
+    private static final XmlFormat<java.sql.Timestamp> SQL_TIMESTAMP_MILLIS_FORMAT = new XmlFormatAsLong<Timestamp>() {
+        @Override
+        public long toLong(Timestamp timestamp) {
+            return timestamp.getTime();
+        }
+
+        @Override
+        public Timestamp fromLong(long l) {
+            return new Timestamp(l);
+        }
+    };
+
+    private static final XmlFormat<java.sql.Timestamp> SQL_TIMESTAMP_ISO_FORMAT = new XmlFormat<java.sql.Timestamp>() {
+
+        @Override
+        public String write(java.sql.Timestamp timestamp) {
+            return LOCAL_DATE_TIME_ISO_FORMAT.write(timestamp.toLocalDateTime());
+        }
+
+        @Override
+        public java.sql.Timestamp read(String s) {
+            return java.sql.Timestamp.valueOf(LOCAL_DATE_TIME_ISO_FORMAT.read(s));
+        }
+    };
+
+    private static final XmlFormat<java.sql.Date> SQL_DATE_MILLIS_FORMAT = new XmlFormatAsLong<java.sql.Date>() {
+        @Override
+        public long toLong(java.sql.Date date) {
+            return date.getTime();
+        }
+
+        @Override
+        public java.sql.Date fromLong(long l) {
+            return new java.sql.Date(l);
+        }
+    };
+
+    private static final XmlFormat<java.sql.Date> SQL_DATE_ISO_FORMAT = new XmlFormat<java.sql.Date>() {
         @Override
         public java.sql.Date read(String s) {
-            return new java.sql.Date(Long.parseLong(s));
+            return java.sql.Date.valueOf(LOCAL_DATE_ISO_FORMAT.read(s));
         }
 
         @Override
         public String write(java.sql.Date date) {
-            return Long.toString(date.getTime());
+            return LOCAL_DATE_ISO_FORMAT.write(date.toLocalDate());
         }
     };
 
-    private static final XmlFormat<java.sql.Time> SQL_TIME_MILLIS_FORMAT = new XmlFormat<java.sql.Time>() {
+    private static final XmlFormat<java.sql.Time> SQL_TIME_MILLIS_FORMAT = new XmlFormatAsLong<java.sql.Time>() {
+        @Override
+        public long toLong(java.sql.Time time) {
+            return time.getTime();
+        }
+
+        @Override
+        public java.sql.Time fromLong(long l) {
+            return new java.sql.Time(l);
+        }
+    };
+
+    private static final XmlFormat<java.sql.Time> SQL_TIME_ISO_FORMAT = new XmlFormat<java.sql.Time>() {
         @Override
         public java.sql.Time read(String s) {
-            return new java.sql.Time(Long.parseLong(s));
+            return java.sql.Time.valueOf(LOCAL_TIME_ISO_FORMAT.read(s));
         }
 
         @Override
         public String write(java.sql.Time time) {
-            return Long.toString(time.getTime());
+            return LOCAL_TIME_ISO_FORMAT.write(time.toLocalTime());
         }
     };
 

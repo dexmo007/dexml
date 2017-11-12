@@ -9,23 +9,35 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlValue;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Optional;
 
-public class ImmutableXmlParser<T> extends XmlParser<T> {
+public class MutableXmlParser<T> extends XmlParser<T> {
+
+    private final boolean acceptPrivateConstructor = false;
 
     private final Constructor<T> constructor;
 
-    protected ImmutableXmlParser(Class<T> clazz, XmlContext context) {
+    protected MutableXmlParser(Class<T> clazz, XmlContext context) {
         super(clazz, context);
-        this.constructor = findMatchingConstructor();
+        try {
+            this.constructor = clazz.getConstructor();
+            if (acceptPrivateConstructor) {
+                constructor.setAccessible(true);
+            }
+        } catch (NoSuchMethodException e) {
+            throw new XmlParseException(e);
+        }
     }
 
     @Override
     public T read(Node root) {
 
-        final Object[] args = new Object[members.values().stream().mapToInt(List::size).sum()];
+        final T result;
+        try {
+            result = constructor.newInstance();
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            throw new XmlParseException(e);
+        }
 
         //attributes
         final NamedNodeMap attributes = root.getAttributes();
@@ -33,7 +45,8 @@ public class ImmutableXmlParser<T> extends XmlParser<T> {
             final Node attribute = attributes.item(i);
             final XmlMember member = getMemberByName(attribute.getNodeName(), XmlAttribute.class);
             final XmlReads reads = context.getReads(member.getType());
-            args[member.getIndex()] = reads.read(attribute.getNodeValue());
+            final Object value = reads.read(attribute.getNodeValue());
+            member.set(result, value);
         }
 
         final NodeList nodes = root.getChildNodes();
@@ -51,32 +64,16 @@ public class ImmutableXmlParser<T> extends XmlParser<T> {
                     final XmlParser<?> parser = context.computeParserIfAbsent(member.getType());
                     arg = parser.read(node);
                 }
-                args[member.getIndex()] = arg;
+                member.set(result, arg);
             } else if (node instanceof Text) {
                 // value
-                final XmlMember value = members.get(XmlValue.class).get(0);
+                final XmlMember member = members.get(XmlValue.class).get(0);
                 final String stringValue = ((Text) node).getWholeText();
-                final XmlReads reads = context.getReads(value.getType());
-                args[value.getIndex()] = reads.read(stringValue);
+                final XmlReads reads = context.getReads(member.getType());
+                final Object value = reads.read(stringValue);
+                member.set(result, value);
             }
         }
-
-        try {
-            return constructor.newInstance(args);
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-            throw new XmlParseException(e);
-        }
-    }
-
-    private Constructor<T> findMatchingConstructor() {
-        final Class<?>[] args = members.values().stream().flatMap(List::stream)
-                .sorted(Comparator.comparingInt(XmlMember::getIndex))
-                .map(XmlMember::getType)
-                .toArray(Class<?>[]::new);
-        try {
-            return clazz.getConstructor(args);
-        } catch (NoSuchMethodException e) {
-            throw new XmlConfigurationException("no matching constructor found");
-        }
+        return result;
     }
 }

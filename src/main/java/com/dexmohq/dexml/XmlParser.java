@@ -71,36 +71,23 @@ public abstract class XmlParser<T> {
         }
         if (useGetters) {
             for (Method method : clazz.getMethods()) {
-                if (isGetter(method) && !method.isAnnotationPresent(XmlTransient.class)) {
-                    //todo work only avoid this effective duplication
+                if (isGetter(method) && !method.isAnnotationPresent(XmlTransient.class)) {//todo or is setter
+                    //todo work out to avoid this effective duplication
                     if (method.isAnnotationPresent(XmlElement.class)) {
-                        map.get(XmlElement.class).add(new XmlGetter(method, index++));
+                        map.get(XmlElement.class).add(new XmlAccessor(clazz, method, index++, true));
                     } else if (method.isAnnotationPresent(XmlAttribute.class)) {
-                        map.get(XmlAttribute.class).add(new XmlGetter(method, index++));
+                        map.get(XmlAttribute.class).add(new XmlAccessor(clazz, method, index++, true));
                     } else if (method.isAnnotationPresent(XmlValue.class)) {
                         if (map.containsKey(XmlValue.class)) {
                             throw new XmlConfigurationException("Only a single @XmlValue is allowed.");
                         }
-                        map.put(XmlValue.class, Collections.singletonList(new XmlGetter(method, index++)));
+                        map.put(XmlValue.class, Collections.singletonList(new XmlAccessor(clazz, method, index++, true)));
                     }
                 }
             }
         }
         return map;
     }
-
-//    private void handleAddition(HashMap<Class<? extends Annotation>, List<XmlMember>> map, XmlMember candidate) {
-//        if (candidate.isAnnotationPresent(XmlElement.class)) {
-//            map.get(XmlElement.class).add(candidate);
-//        } else if (candidate.isAnnotationPresent(XmlAttribute.class)) {
-//            map.get(XmlAttribute.class).add(candidate);
-//        } else if (candidate.isAnnotationPresent(XmlValue.class)) {
-//            if (map.containsKey(XmlValue.class)) {
-//                throw new XmlConfigurationException("Only a single @XmlValue is allowed.");
-//            }
-//            map.put(XmlValue.class, Collections.singletonList(candidate));
-//        }
-//    }
 
     private static boolean isGetter(Method method) {
         return method.getName().startsWith("get")
@@ -137,13 +124,26 @@ public abstract class XmlParser<T> {
             attr.setValue(getValue(attribute, object));
             root.appendChild(attr);
         }
-        //todo configuration to decide what to do in case no exact writes but matching are existing:
-        // use matching to provide value as string OR build new parser
-        // register newly build parser in the context for it is created only once
         for (XmlMember element : members.get(XmlElement.class)) {
-            final Class<?> type = element.getType();
-            final Optional<? extends XmlWrites> writesOptional = context.getWritesOptional((Class) type);
             final Object value = element.get(object);
+            if (element.isList()) {
+                final Iterator<?> iterator = element.getAsIterable(value).iterator();
+                final Element list = document.createElement(element.getName(XmlElement.class));
+                if (iterator.hasNext()) {
+                    final Object first = iterator.next();
+                    final XmlParser parser = context.computeParserIfAbsent(first.getClass());//todo formatted
+                    list.appendChild(parser.write(first));
+                    while (iterator.hasNext()) {
+                        final Object next = iterator.next();
+                        list.appendChild(parser.write(next));
+                    }
+                }
+                root.appendChild(list);
+                continue;
+            }
+
+            final Class type = element.getType();
+            final Optional<? extends XmlWrites> writesOptional = context.getWritesOptional(type);
             if (writesOptional.isPresent()) {
                 final Element xmlElement = document.createElement(element.getName(XmlElement.class));
                 xmlElement.setTextContent(writesOptional.get().write(value));
