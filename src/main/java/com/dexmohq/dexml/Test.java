@@ -2,7 +2,7 @@ package com.dexmohq.dexml;
 
 public class Test {
 
-//    static class XmlParser<T> {
+//    static class AbstractXmlParser<T> {
 //
 //        private final Class<T> clazz;
 //        private final XmlContext context;
@@ -12,14 +12,14 @@ public class Test {
 //
 //        private final Map<Class<? extends Annotation>, List<XmlMember>> fields;
 //
-//        private XmlParser(Class<T> clazz, XmlContext context) {
+//        private AbstractXmlParser(Class<T> clazz, XmlContext context) {
 //            this.clazz = clazz;
 //            this.context = context;
 //            this.fields = fields();
 //        }
 //
-//        static <T> XmlParser<T> create(Class<T> clazz) {
-//            return new XmlParser<>(clazz, XmlContext.newDefault());
+//        static <T> AbstractXmlParser<T> appendChild(Class<T> clazz) {
+//            return new AbstractXmlParser<>(clazz, XmlContext.newDefault());
 //        }
 //
 //        private static void checkConfiguration() {

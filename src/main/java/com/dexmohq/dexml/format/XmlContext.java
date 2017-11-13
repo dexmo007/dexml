@@ -1,9 +1,11 @@
 package com.dexmohq.dexml.format;
 
-import com.dexmohq.dexml.XmlFormatException;
-import com.dexmohq.dexml.XmlParseException;
-import com.dexmohq.dexml.XmlParser;
+import com.dexmohq.dexml.*;
+import com.dexmohq.dexml.util.StringUtils;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
@@ -16,7 +18,7 @@ import java.util.*;
 
 
 /**
- * Context of predefined reads and writes
+ * Provides the context for parsing to and from XML, reveals configurability
  *
  * @author Henrik Drefs
  */
@@ -29,9 +31,9 @@ public class XmlContext {
     private final Map<Class<?>, XmlWrites<?>> writesMap = new HashMap<>();
     private final Map<Class<?>, XmlReads<?>> readsMap = new HashMap<>();
 
-    private final Map<Class<?>, XmlParser<?>> cache = new HashMap<>();
+    private final Map<Class<?>, NodeParser<?>> cache = new HashMap<>();
 
-    private XmlContext(boolean climbHierarchy) {
+    protected XmlContext(boolean climbHierarchy) {
         this.climbHierarchy = climbHierarchy;
         // register primitives
         registerFormat(Integer.class, PrimitiveFormats.INT_FORMAT);
@@ -71,6 +73,16 @@ public class XmlContext {
         return newDefault(false);
     }
 
+    private final DocumentBuilder documentBuilder = getDocumentBuilder();
+
+    private static DocumentBuilder getDocumentBuilder() {
+        try {
+            return DocumentBuilderFactory.newInstance().newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
     public XmlContext isoDateTimeFormatting() {
         registerFormat(Date.class, UTIL_DATE_ISO_FORMAT);
         registerFormat(LocalDateTime.class, LOCAL_DATE_TIME_ISO_FORMAT);
@@ -82,9 +94,34 @@ public class XmlContext {
         return this;
     }
 
+    public String toTagName(String name) {
+        return StringUtils.transformCamelCase(name, "-");
+    }
+
+    public String toAttributeName(String name) {
+        return StringUtils.transformCamelCase(name, "_");
+    }
+
     @SuppressWarnings("unchecked")
-    public <T> XmlParser<T> computeParserIfAbsent(Class<T> clazz) {
-        return (XmlParser<T>) cache.computeIfAbsent(clazz, aClass -> XmlParser.create(clazz, this));
+    public <T> NodeParser<T> computeElementParserIfAbsent(Class<T> type) {
+        return (NodeParser<T>) cache.computeIfAbsent(type, aClass -> new ElementParser<>(type, this));
+    }
+
+    /**
+     * If a format exists for the given type, an attribute parser is returned;
+     * otherwise an element parser is returned
+     *
+     * @param type class of the type to be parsed
+     * @param <T>  type to be parsed
+     * @return an attribute or element parser
+     */
+    public <T> NodeParser<T> getArbitraryParser(Class<T> type) {
+        final Optional<XmlFormat<T>> formatOptional = getFormatOptional(type);
+        if (formatOptional.isPresent()) {
+            final XmlFormat<T> format = formatOptional.get();
+            return new AttributeParser<>(format, this);
+        }
+        return computeElementParserIfAbsent(type);
     }
 
     /**

@@ -34,6 +34,23 @@ public final class ArrayUtils {
         return o != null && isArray(o.getClass());
     }
 
+    public static boolean contains(Object[] array, Object object) {
+        for (Object o : array) {
+            if (o != null && o.equals(object))
+                return true;
+        }
+        return false;
+    }
+
+    public static boolean containsType(Object[] array, Class<?> clazz) {
+        for (Object o : array) {
+            if (o != null && clazz.isAssignableFrom(o.getClass())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void main(String[] args) {
         System.out.println(isArray(new String[5]));
         System.out.println(isArray(new int[5]));
