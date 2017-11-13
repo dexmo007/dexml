@@ -1,4 +1,4 @@
-package com.dexmohq.dexml;
+package com.dexmohq.dexml.util;
 
 import java.util.ArrayList;
 import java.util.List;
