@@ -1,6 +1,6 @@
 package com.dexmohq.dexml;
 
-class XmlConfigurationException extends RuntimeException {
+public class XmlConfigurationException extends RuntimeException {
     public XmlConfigurationException() {
     }
 

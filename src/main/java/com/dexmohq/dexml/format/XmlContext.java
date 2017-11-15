@@ -1,11 +1,22 @@
 package com.dexmohq.dexml.format;
 
 import com.dexmohq.dexml.*;
+import com.dexmohq.dexml.annotation.Transient;
+import com.dexmohq.dexml.util.ArrayUtils;
+import com.dexmohq.dexml.util.ReflectUtils;
 import com.dexmohq.dexml.util.StringUtils;
+import com.google.common.collect.Sets;
+import org.w3c.dom.Document;
+import sun.security.pkcs11.wrapper.CK_AES_CTR_PARAMS;
 
+import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
@@ -15,6 +26,8 @@ import java.text.SimpleDateFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
+import static com.dexmohq.dexml.util.ReflectUtils.isDerivedAnnotationPresent;
 
 
 /**
@@ -83,6 +96,10 @@ public class XmlContext {
         }
     }
 
+    public Document newDocument() {
+        return documentBuilder.newDocument();
+    }
+
     public XmlContext isoDateTimeFormatting() {
         registerFormat(Date.class, UTIL_DATE_ISO_FORMAT);
         registerFormat(LocalDateTime.class, LOCAL_DATE_TIME_ISO_FORMAT);
@@ -100,6 +117,22 @@ public class XmlContext {
 
     public String toAttributeName(String name) {
         return StringUtils.transformCamelCase(name, "_");
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> XmlWrites<T> computeAnnotatedWritesIfAbsent(Class<T> clazz) {
+        return (XmlWrites<T>) writesMap.computeIfAbsent(clazz, AnnotatedValueWrites::create);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> XmlReads<T> computeAnnotatedReadsIfAbsent(Class<T> clazz) {
+        return (XmlReads<T>) readsMap.computeIfAbsent(clazz, AnnotatedValueReads::new);
+    }
+
+    public <T> XmlFormat<T> computeAnnotatedFormatIfAbsent(Class<T> clazz) {
+        final XmlReads<?> reads = readsMap.computeIfAbsent(clazz, AnnotatedFormat::new);
+//        if (reads)
+        return null;
     }
 
     @SuppressWarnings("unchecked")
@@ -349,6 +382,29 @@ public class XmlContext {
             return bigInteger.toString();
         }
     };
+
+    private final Set<Class<? extends Annotation>> supportedTransientAnnotations = Sets.newHashSet(Collections.singletonList(Transient.class));
+
+    public XmlContext supportTransientAnnotation(Class<? extends Annotation> transientAnnotation) {
+        supportedTransientAnnotations.add(transientAnnotation);
+        return this;
+    }
+
+    public XmlContext supportJAXB() {
+        supportTransientAnnotation(XmlTransient.class);
+        return this;
+    }
+
+    //todo jackson support
+    //todo gson support
+
+    public boolean isTransient(Method getter, Method setter, Field field, Annotation[] fieldAnnotations) {
+        return field != null && Modifier.isTransient(field.getModifiers())
+                || supportedTransientAnnotations.stream().anyMatch(a ->
+                isDerivedAnnotationPresent(getter, a)
+                        || isDerivedAnnotationPresent(setter, a)
+                        || ArrayUtils.containsType(fieldAnnotations, a));
+    }
 
     public static abstract class XmlFormatAsLong<T> implements XmlFormat<T> {
         public abstract long toLong(T t);

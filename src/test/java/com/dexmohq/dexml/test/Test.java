@@ -3,6 +3,7 @@ package com.dexmohq.dexml.test;
 import com.dexmohq.dexml.XmlParser;
 import com.dexmohq.dexml.XmlParserFactory;
 import com.dexmohq.dexml.util.ArrayUtils;
+import com.dexmohq.dexml.util.StringUtils;
 import org.w3c.dom.Node;
 
 import javax.xml.bind.annotation.XmlAttribute;
@@ -85,19 +86,6 @@ public class Test {
         }
     }
 
-    private static String nodeToString(Node node) {
-        StringWriter sw = new StringWriter();
-        try {
-            Transformer t = TransformerFactory.newInstance().newTransformer();
-            t.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
-            t.setOutputProperty(OutputKeys.INDENT, "yes");
-            t.transform(new DOMSource(node), new StreamResult(sw));
-        } catch (TransformerException te) {
-            System.out.println("nodeToString Transformer Exception");
-        }
-        return sw.toString();
-    }
-
     public static void main(String[] args) throws Exception {
 
         final Annotation[] annotations = FooInfo.class.getDeclaredField("awesomeText").getAnnotations();
@@ -111,7 +99,7 @@ public class Test {
 
         final Node xml = parser.write(fooInfo);
 
-        System.out.println(nodeToString(xml));
+        System.out.println(StringUtils.nodeToString(xml));
 
 
 //        final DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();

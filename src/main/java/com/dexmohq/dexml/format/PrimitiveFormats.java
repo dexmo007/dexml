@@ -102,6 +102,4 @@ final class PrimitiveFormats {
         }
     };
 
-    //Defaults: Date,Calender,String,BigDecimal,BigInteger
-
 }

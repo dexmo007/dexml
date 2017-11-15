@@ -2,23 +2,19 @@ package com.dexmohq.dexml;
 
 import com.dexmohq.dexml.format.XmlContext;
 import com.dexmohq.dexml.format.XmlFormat;
-import com.dexmohq.dexml.util.ArrayUtils;
-import com.dexmohq.dexml.util.StringUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.XmlValue;
 import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -84,15 +80,15 @@ public class ElementParser<T> implements NodeParser<T> {
                 final Method setter = descriptor.getWriteMethod();
                 String name = descriptor.getName();
                 Annotation[] fieldAnnotations = new Annotation[0];
+                Field field = null;
                 try {
-                    fieldAnnotations = type.getDeclaredField(name).getAnnotations();
+                    field = type.getDeclaredField(name);
+                    fieldAnnotations = field.getAnnotations();
                 } catch (NoSuchFieldException e) {
                     // fall
                 }
                 // skip properties marked as transient
-                if (getter.isAnnotationPresent(XmlTransient.class)
-                        || setter != null && setter.isAnnotationPresent(XmlTransient.class)
-                        || ArrayUtils.containsType(fieldAnnotations, XmlTransient.class))//todo throw exception if also annotated with xml type
+                if (context.isTransient(getter, setter, field, fieldAnnotations))//todo throw exception if also annotated with xml type
                     continue;
                 // extracts xml type that might be annotated on getter, setter or the field; fails on ambiguity
                 Annotation xmlType = tryGetXmlType(getter.getAnnotations(), null, name);
