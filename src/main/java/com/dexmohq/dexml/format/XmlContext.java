@@ -3,6 +3,7 @@ package com.dexmohq.dexml.format;
 import com.dexmohq.dexml.*;
 import com.dexmohq.dexml.annotation.Transient;
 import com.dexmohq.dexml.util.ArrayUtils;
+import com.dexmohq.dexml.util.Property;
 import com.dexmohq.dexml.util.ReflectUtils;
 import com.dexmohq.dexml.util.StringUtils;
 import com.google.common.collect.Sets;
@@ -13,6 +14,10 @@ import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import java.beans.BeanInfo;
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -397,6 +402,33 @@ public class XmlContext {
 
     //todo jackson support
     //todo gson support
+
+    public List<Property> getProperties(Class<?> clazz) {
+        final BeanInfo beanInfo;
+        try {
+            beanInfo = Introspector.getBeanInfo(clazz, Object.class);
+        } catch (IntrospectionException e) {
+            throw new XmlConfigurationException("Could not get bean info");
+        }
+        final PropertyDescriptor[] propertyDescriptors = beanInfo.getPropertyDescriptors();
+        final ArrayList<Property> properties = new ArrayList<>(propertyDescriptors.length);
+        for (PropertyDescriptor descriptor : propertyDescriptors) {//todo scan fields and allow node info to work with a field as well
+            final Method getter = descriptor.getReadMethod();
+            final Method setter = descriptor.getWriteMethod();
+            Field field = null;
+            try {
+                field = clazz.getDeclaredField(descriptor.getName());
+            } catch (NoSuchFieldException e) {
+                // fall
+            }
+            // skip properties marked as transient
+            if (!isTransient(getter, setter, field, field != null ? field.getAnnotations() : new Annotation[0])) {
+                //todo throw exception if also annotated with xml type
+                properties.add(new Property(getter, setter, field));
+            }
+        }
+        return properties;
+    }
 
     public boolean isTransient(Method getter, Method setter, Field field, Annotation[] fieldAnnotations) {
         return field != null && Modifier.isTransient(field.getModifiers())

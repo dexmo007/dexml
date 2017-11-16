@@ -2,6 +2,7 @@ package com.dexmohq.dexml;
 
 import com.dexmohq.dexml.format.XmlContext;
 import com.dexmohq.dexml.format.XmlFormat;
+import com.dexmohq.dexml.util.Property;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -72,57 +73,41 @@ public class ElementParser<T> implements NodeParser<T> {
 
     @SuppressWarnings("unchecked")
     private Map<String, NodeInfo> initMap() {
-        try {
-            final HashMap<String, NodeInfo> map = new HashMap<>();
-            final BeanInfo beanInfo = Introspector.getBeanInfo(type, Object.class);
-            for (PropertyDescriptor descriptor : beanInfo.getPropertyDescriptors()) {//todo scan fields and allow node info to work with a field as well
-                final Method getter = descriptor.getReadMethod();
-                final Method setter = descriptor.getWriteMethod();
-                String name = descriptor.getName();
-                Annotation[] fieldAnnotations = new Annotation[0];
-                Field field = null;
-                try {
-                    field = type.getDeclaredField(name);
-                    fieldAnnotations = field.getAnnotations();
-                } catch (NoSuchFieldException e) {
-                    // fall
-                }
-                // skip properties marked as transient
-                if (context.isTransient(getter, setter, field, fieldAnnotations))//todo throw exception if also annotated with xml type
+        final HashMap<String, NodeInfo> map = new HashMap<>();
+        for (Property property : context.getProperties(type)) {
+            final Method getter = property.getGetter();
+            final Method setter = property.getGetter();
+            String name = property.getName();
+            // extracts xml type that might be annotated on getter, setter or the field; fails on ambiguity
+            Annotation xmlType = tryGetXmlType(getter.getAnnotations(), null, name);
+            if (setter != null)
+                xmlType = tryGetXmlType(setter.getAnnotations(), xmlType, name);
+            xmlType = tryGetXmlType(property.getField().getAnnotations(), xmlType, name);
+            final Class<?> type = property.getType();
+            if (xmlType == null) {
+                final NodeParser<?> parser = context.getArbitraryParser(type);
+                map.put(name, new NodeInfo(name, parser, getter));
+            } else {
+                if (xmlType.annotationType() == XmlValue.class) {
+                    final XmlFormat format = context.getFormat(type);
+                    final NodeParser appender = new ValueParser(format);
+                    if (map.put(VALUE_IDENTIFIER, new NodeInfo(null, appender, getter)) != null) {
+                        throw new XmlConfigurationException("Duplicate @XmlValue not allowed");
+                    }
                     continue;
-                // extracts xml type that might be annotated on getter, setter or the field; fails on ambiguity
-                Annotation xmlType = tryGetXmlType(getter.getAnnotations(), null, name);
-                if (setter != null)
-                    xmlType = tryGetXmlType(setter.getAnnotations(), xmlType, name);
-                xmlType = tryGetXmlType(fieldAnnotations, xmlType, name);
-                final Class<?> type = descriptor.getPropertyType();
-                if (xmlType == null) {
-                    final NodeParser<?> parser = context.getArbitraryParser(type);
-                    map.put(name, new NodeInfo(name, parser, getter));
-                } else {
-                    if (xmlType.annotationType() == XmlValue.class) {
-                        final XmlFormat format = context.getFormat(type);
-                        final NodeParser appender = new ValueParser(format);
-                        if (map.put(VALUE_IDENTIFIER, new NodeInfo(null, appender, getter)) != null) {
-                            throw new XmlConfigurationException("Duplicate @XmlValue not allowed");
-                        }
-                        continue;
-                    }
-                    final String actualName = extractName(xmlType, name);
-                    if (xmlType.annotationType() == XmlAttribute.class) {
-                        final XmlFormat format = context.getFormat(type);
-                        final NodeParser appender = new AttributeParser(format, context);
-                        map.put(actualName, new NodeInfo(actualName, appender, getter));
-                    } else { // @XmlElement
-                        final NodeParser appender = context.computeElementParserIfAbsent(type);
-                        map.put(actualName, new NodeInfo(actualName, appender, getter));
-                    }
+                }
+                final String actualName = extractName(xmlType, name);
+                if (xmlType.annotationType() == XmlAttribute.class) {
+                    final XmlFormat format = context.getFormat(type);
+                    final NodeParser appender = new AttributeParser(format, context);
+                    map.put(actualName, new NodeInfo(actualName, appender, getter));
+                } else { // @XmlElement
+                    final NodeParser appender = context.computeElementParserIfAbsent(type);
+                    map.put(actualName, new NodeInfo(actualName, appender, getter));
                 }
             }
-            return map;
-        } catch (IntrospectionException e) {
-            throw new XmlConfigurationException(e);
         }
+        return map;
     }
 
     @SuppressWarnings("JavaReflectionMemberAccess")
