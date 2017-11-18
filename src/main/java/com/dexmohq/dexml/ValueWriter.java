@@ -5,11 +5,11 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.Text;
 
-public class ValueParser<T> implements NodeParser<T> {
+public class ValueWriter<T> implements NodeWriter<T> {
 
     private final XmlFormat<T> format;
 
-    public ValueParser(XmlFormat<T> format) {
+    public ValueWriter(XmlFormat<T> format) {
         this.format = format;
     }
 

@@ -1,14 +1,17 @@
 package com.dexmohq.dexml.format;
 
 import com.dexmohq.dexml.*;
+import com.dexmohq.dexml.annotation.Immutable;
 import com.dexmohq.dexml.annotation.Transient;
 import com.dexmohq.dexml.util.ArrayUtils;
+import com.dexmohq.dexml.util.IndexedProperties;
 import com.dexmohq.dexml.util.Property;
-import com.dexmohq.dexml.util.ReflectUtils;
 import com.dexmohq.dexml.util.StringUtils;
 import com.google.common.collect.Sets;
+import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
-import sun.security.pkcs11.wrapper.CK_AES_CTR_PARAMS;
+import org.w3c.dom.Node;
+import org.w3c.dom.Text;
 
 import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.parsers.DocumentBuilder;
@@ -43,13 +46,16 @@ import static com.dexmohq.dexml.util.ReflectUtils.isDerivedAnnotationPresent;
 public class XmlContext {
 
     private static final int INTERFACE_HIERARCHY_DISTANCE = Integer.MAX_VALUE - 1;
+    public static final Comparator<String> ALPHABETIC = String::compareTo;
 
     private final boolean climbHierarchy;
 
     private final Map<Class<?>, XmlWrites<?>> writesMap = new HashMap<>();
     private final Map<Class<?>, XmlReads<?>> readsMap = new HashMap<>();
 
-    private final Map<Class<?>, NodeParser<?>> cache = new HashMap<>();
+    private final Map<Class<?>, NodeWriter<?>> cache = new HashMap<>();
+
+    private final Map<Class<?>, NodeReader<?>> readerCache = new HashMap<>();
 
     protected XmlContext(boolean climbHierarchy) {
         this.climbHierarchy = climbHierarchy;
@@ -141,8 +147,34 @@ public class XmlContext {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> NodeParser<T> computeElementParserIfAbsent(Class<T> type) {
-        return (NodeParser<T>) cache.computeIfAbsent(type, aClass -> new ElementParser<>(type, this));
+    public <T> NodeWriter<T> computeElementParserIfAbsent(Class<T> type) {
+        return (NodeWriter<T>) cache.computeIfAbsent(type, aClass -> new ElementWriter<>(type, this));
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> NodeReader<T> computeNodeReaderIfAbsent(Property.NodeType nodeType, Class<T> type) {
+        switch (nodeType) {
+            case ATTRIBUTE:
+            case VALUE:
+                final XmlReads<?> xmlReads = readsMap.get(type);
+                if (xmlReads == null) {
+                    throw new XmlParseException("No reads found for type: " + type);
+                }
+                return node -> (T) xmlReads.read(node.getNodeValue());
+            case ELEMENT:
+            default:
+                return (NodeReader<T>) readerCache.computeIfAbsent(type,
+                        this::newElementReader);
+
+        }
+    }
+
+    private <T> NodeReader<T> newElementReader(Class<T> type) {
+        if (type.isAnnotationPresent(Immutable.class)) {
+            return new ImmutableNodeReader<>(type, this);
+        }
+
+        return new ImmutableNodeReader<>(type, this);//todo decide mutability
     }
 
     /**
@@ -153,11 +185,11 @@ public class XmlContext {
      * @param <T>  type to be parsed
      * @return an attribute or element parser
      */
-    public <T> NodeParser<T> getArbitraryParser(Class<T> type) {
+    public <T> NodeWriter<T> getArbitraryWriter(Class<T> type) {
         final Optional<XmlFormat<T>> formatOptional = getFormatOptional(type);
         if (formatOptional.isPresent()) {
             final XmlFormat<T> format = formatOptional.get();
-            return new AttributeParser<>(format, this);
+            return new AttributeWriter<>(format, this);
         }
         return computeElementParserIfAbsent(type);
     }
@@ -388,7 +420,8 @@ public class XmlContext {
         }
     };
 
-    private final Set<Class<? extends Annotation>> supportedTransientAnnotations = Sets.newHashSet(Collections.singletonList(Transient.class));
+    private final Set<Class<? extends Annotation>> supportedTransientAnnotations = new HashSet<>(
+            Arrays.asList(Transient.class, XmlTransient.class));
 
     public XmlContext supportTransientAnnotation(Class<? extends Annotation> transientAnnotation) {
         supportedTransientAnnotations.add(transientAnnotation);
@@ -400,34 +433,49 @@ public class XmlContext {
         return this;
     }
 
+    public XmlContext disableJAXBSupport() {
+        supportedTransientAnnotations.remove(XmlTransient.class);
+        return this;
+    }
+
     //todo jackson support
     //todo gson support
 
-    public List<Property> getProperties(Class<?> clazz) {
+    /**
+     * Returns an ordered list of all relevant (i.e. non-transient) properties
+     *
+     * @param type
+     * @return
+     */
+    public Map<String, Property> getProperties(Class<?> type) {//todo follow annotated ordering
         final BeanInfo beanInfo;
         try {
-            beanInfo = Introspector.getBeanInfo(clazz, Object.class);
+            beanInfo = Introspector.getBeanInfo(type, Object.class);
         } catch (IntrospectionException e) {
             throw new XmlConfigurationException("Could not get bean info");
         }
+        final Map<String, Property> map;
+//        map = new TreeMap<>(ALPHABETIC); todo configurable
         final PropertyDescriptor[] propertyDescriptors = beanInfo.getPropertyDescriptors();
-        final ArrayList<Property> properties = new ArrayList<>(propertyDescriptors.length);
+        map = new IndexedProperties(propertyDescriptors.length);//todo by given order
         for (PropertyDescriptor descriptor : propertyDescriptors) {//todo scan fields and allow node info to work with a field as well
             final Method getter = descriptor.getReadMethod();
             final Method setter = descriptor.getWriteMethod();
             Field field = null;
             try {
-                field = clazz.getDeclaredField(descriptor.getName());
+                field = type.getDeclaredField(descriptor.getName());
             } catch (NoSuchFieldException e) {
                 // fall
             }
             // skip properties marked as transient
             if (!isTransient(getter, setter, field, field != null ? field.getAnnotations() : new Annotation[0])) {
                 //todo throw exception if also annotated with xml type
-                properties.add(new Property(getter, setter, field));
+                if (map.put(descriptor.getName(), new Property(descriptor, field)) != null) {
+                    throw new XmlConfigurationException("Duplicate names defined: " + descriptor.getName());
+                }
             }
         }
-        return properties;
+        return map;
     }
 
     public boolean isTransient(Method getter, Method setter, Field field, Annotation[] fieldAnnotations) {

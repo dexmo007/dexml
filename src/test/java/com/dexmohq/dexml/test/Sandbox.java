@@ -159,20 +159,24 @@ public class Sandbox {
     }
 
     public static void main(String[] args) throws ParserConfigurationException, IOException, SAXException, NoSuchMethodException {
-        final AbstractReader reader = new AbstractReader();
-        final KepTrackingData trackingData = new KepTrackingData();
-        trackingData.setCons("78z319782631");
-        trackingData.setTrackingNumber("78123612736187");
+//        final AbstractReader reader = new AbstractReader();
+//        final KepTrackingData trackingData = new KepTrackingData();
+//        trackingData.setCons("78z319782631");
+//        trackingData.setTrackingNumber("78123612736187");
+//
+//        final Method getTypeMethod = trackingData.getClass().getMethod("getType");
+//        System.out.println(Arrays.toString(getTypeMethod.getAnnotations()));
+//        System.out.println(getTypeMethod.isAnnotationPresent(Transient.class));
+//
+//        final Node node = XmlParserFactory.createParser().write(trackingData);
+//        System.out.println(StringUtils.nodeToString(node));
+//
+//        final TrackingData read = reader.read(TrackingData.class, node);
+//        System.out.println(read);
+        String s = "";
+        System.out.println(s instanceof CharSequence);
 
-        final Method getTypeMethod = trackingData.getClass().getMethod("getType");
-        System.out.println(Arrays.toString(getTypeMethod.getAnnotations()));
-        System.out.println(getTypeMethod.isAnnotationPresent(Transient.class));
 
-        final Node node = XmlParserFactory.createParser().write(trackingData);
-        System.out.println(StringUtils.nodeToString(node));
-
-        final TrackingData read = reader.read(TrackingData.class, node);
-        System.out.println(read);
     }
 
 }

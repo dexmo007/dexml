@@ -15,4 +15,10 @@ public @interface Immutable {
      */
     boolean strict() default true;
 
+    /**
+     * if true, the constructor can be private
+     * @return
+     */
+    boolean allowInaccessible() default false;
+
 }

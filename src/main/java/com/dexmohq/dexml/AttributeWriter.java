@@ -6,12 +6,12 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
-public class AttributeParser<T> implements NodeParser<T> {
+public class AttributeWriter<T> implements NodeWriter<T> {
 
     private final XmlFormat<T> format;
     private final XmlContext context;
 
-    public AttributeParser(XmlFormat<T> format, XmlContext context) {
+    public AttributeWriter(XmlFormat<T> format, XmlContext context) {
         this.format = format;
         this.context = context;
     }

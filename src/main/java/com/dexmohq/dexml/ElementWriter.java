@@ -10,16 +10,12 @@ import org.w3c.dom.Node;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlValue;
-import java.beans.BeanInfo;
-import java.beans.IntrospectionException;
-import java.beans.Introspector;
-import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ElementParser<T> implements NodeParser<T> {
+public class ElementWriter<T> implements NodeWriter<T> {
 
     private static final String DEFAULT_NAME_IDENTIFIER = "##default";
     private static final String VALUE_IDENTIFIER = "##VALUE";
@@ -28,15 +24,10 @@ public class ElementParser<T> implements NodeParser<T> {
     private final XmlContext context;
     private final Map<String, NodeInfo> nodes;
 
-    public ElementParser(Class<T> type, XmlContext context) {
+    public ElementWriter(Class<T> type, XmlContext context) {
         this.type = type;
         this.context = context;
         this.nodes = initMap();
-//        System.out.println(type.getSimpleName() + " <<<<");
-//        for (Map.Entry<String, NodeInfo> entry : nodes.entrySet()) {
-//            System.out.println(entry.getKey() + ": " + entry.getValue().appender.getClass().getSimpleName());
-//        }
-//        System.out.println("----------------------");
     }
 
     @SuppressWarnings("unchecked")
@@ -45,7 +36,7 @@ public class ElementParser<T> implements NodeParser<T> {
         final String tagName = context.toTagName(name);
         final Element element = document.createElement(tagName);
         for (NodeInfo nodeInfo : nodes.values()) {
-            nodeInfo.appender.appendChild(document, element, nodeInfo.name, nodeInfo.get(t));
+            nodeInfo.writer.appendChild(document, element, nodeInfo.name, nodeInfo.get(t));
         }
         parent.appendChild(element);
     }
@@ -53,12 +44,12 @@ public class ElementParser<T> implements NodeParser<T> {
     private static class NodeInfo {
 
         private String name;
-        private final NodeParser appender;
+        private final NodeWriter writer;
         private final Method getter;
 
-        NodeInfo(String name, NodeParser appender, Method getter) {
+        NodeInfo(String name, NodeWriter writer, Method getter) {
             this.name = name;
-            this.appender = appender;
+            this.writer = writer;
             this.getter = getter;
         }
 
@@ -85,12 +76,12 @@ public class ElementParser<T> implements NodeParser<T> {
             xmlType = tryGetXmlType(property.getField().getAnnotations(), xmlType, name);
             final Class<?> type = property.getType();
             if (xmlType == null) {
-                final NodeParser<?> parser = context.getArbitraryParser(type);
-                map.put(name, new NodeInfo(name, parser, getter));
+                final NodeWriter<?> writer = context.getArbitraryWriter(type);
+                map.put(name, new NodeInfo(name, writer, getter));
             } else {
                 if (xmlType.annotationType() == XmlValue.class) {
                     final XmlFormat format = context.getFormat(type);
-                    final NodeParser appender = new ValueParser(format);
+                    final NodeWriter appender = new ValueWriter(format);
                     if (map.put(VALUE_IDENTIFIER, new NodeInfo(null, appender, getter)) != null) {
                         throw new XmlConfigurationException("Duplicate @XmlValue not allowed");
                     }
@@ -99,10 +90,10 @@ public class ElementParser<T> implements NodeParser<T> {
                 final String actualName = extractName(xmlType, name);
                 if (xmlType.annotationType() == XmlAttribute.class) {
                     final XmlFormat format = context.getFormat(type);
-                    final NodeParser appender = new AttributeParser(format, context);
+                    final NodeWriter appender = new AttributeWriter(format, context);
                     map.put(actualName, new NodeInfo(actualName, appender, getter));
                 } else { // @XmlElement
-                    final NodeParser appender = context.computeElementParserIfAbsent(type);
+                    final NodeWriter appender = context.computeElementParserIfAbsent(type);
                     map.put(actualName, new NodeInfo(actualName, appender, getter));
                 }
             }
