@@ -51,9 +51,13 @@ public final class ArrayUtils {
         return false;
     }
 
-    public static void main(String[] args) {
-        System.out.println(isArray(new String[5]));
-        System.out.println(isArray(new int[5]));
+    public static int indexOf(Object[] array, Object o) {
+        for (int i = 0; i < array.length; i++) {
+            final Object o1 = array[i];
+            if (o1 != null && o1.equals(o)) {
+                return i;
+            }
+        }
+        return -1;
     }
-
 }

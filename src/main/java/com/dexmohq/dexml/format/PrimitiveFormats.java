@@ -1,6 +1,6 @@
 package com.dexmohq.dexml.format;
 
-import com.dexmohq.dexml.XmlParseException;
+import com.dexmohq.dexml.exception.XmlParseException;
 
 final class PrimitiveFormats {
 

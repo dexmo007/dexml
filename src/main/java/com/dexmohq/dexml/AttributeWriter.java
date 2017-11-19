@@ -1,5 +1,6 @@
 package com.dexmohq.dexml;
 
+import com.dexmohq.dexml.exception.XmlConfigurationException;
 import com.dexmohq.dexml.format.XmlWrites;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;

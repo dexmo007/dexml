@@ -1,4 +1,4 @@
-package com.dexmohq.dexml;
+package com.dexmohq.dexml.exception;
 
 public class XmlFormatException extends RuntimeException {
     public XmlFormatException() {

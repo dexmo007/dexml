@@ -2,6 +2,7 @@ package com.dexmohq.dexml;
 
 import com.dexmohq.dexml.annotation.WritesMethod;
 import com.dexmohq.dexml.annotation.WritesString;
+import com.dexmohq.dexml.exception.XmlConfigurationException;
 import com.dexmohq.dexml.format.XmlWrites;
 import com.dexmohq.dexml.util.ReflectUtils;
 

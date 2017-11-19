@@ -1,15 +1,12 @@
 package com.dexmohq.dexml;
 
+import com.dexmohq.dexml.exception.XmlParseException;
 import com.dexmohq.dexml.util.AnyArrayList;
 import com.dexmohq.dexml.util.ArrayUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Member;
-import java.util.Arrays;
-import java.util.stream.Stream;
 
 abstract class XmlMember implements AnnotatedElement {
 

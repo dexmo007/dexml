@@ -1,10 +1,11 @@
 package com.dexmohq.dexml;
 
 import com.dexmohq.dexml.annotation.Immutable;
+import com.dexmohq.dexml.exception.XmlConfigurationException;
+import com.dexmohq.dexml.exception.XmlParseException;
 import com.dexmohq.dexml.format.XmlContext;
 import com.dexmohq.dexml.util.Property;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;

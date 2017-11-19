@@ -1,6 +1,6 @@
 package com.dexmohq.dexml.util;
 
-import com.dexmohq.dexml.XmlParseException;
+import com.dexmohq.dexml.exception.XmlParseException;
 import org.w3c.dom.Node;
 
 import java.beans.PropertyDescriptor;

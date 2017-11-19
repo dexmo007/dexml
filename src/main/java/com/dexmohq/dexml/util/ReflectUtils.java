@@ -1,7 +1,9 @@
 package com.dexmohq.dexml.util;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class ReflectUtils {
@@ -18,6 +20,16 @@ public final class ReflectUtils {
             }
         }
         return annotated;
+    }
+
+    public static <T extends AnnotatedElement> List<T> filterByAnnotation(T[] annotatedElements, Class<? extends Annotation> annotationType) {
+        final ArrayList<T> filtered = new ArrayList<>();
+        for (T annotatedElement : annotatedElements) {
+            if (annotatedElement.isAnnotationPresent(annotationType)) {
+                filtered.add(annotatedElement);
+            }
+        }
+        return filtered;
     }
 
     public static boolean isMethodAnnotationPresent(Class<?> clazz, Class<? extends Annotation> annotation) {

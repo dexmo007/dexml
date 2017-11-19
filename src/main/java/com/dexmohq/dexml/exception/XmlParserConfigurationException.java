@@ -1,4 +1,4 @@
-package com.dexmohq.dexml;
+package com.dexmohq.dexml.exception;
 
 class XmlParserConfigurationException extends RuntimeException {
     public XmlParserConfigurationException() {

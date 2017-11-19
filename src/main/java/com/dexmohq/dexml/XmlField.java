@@ -1,7 +1,8 @@
 package com.dexmohq.dexml;
 
+import com.dexmohq.dexml.exception.XmlParseException;
+
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 
 public class XmlField extends XmlMember {

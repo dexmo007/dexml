@@ -1,13 +1,11 @@
 package com.dexmohq.dexml.test;
 
-import com.dexmohq.dexml.XmlConfigurationException;
-import com.dexmohq.dexml.XmlParserFactory;
+import com.dexmohq.dexml.exception.XmlConfigurationException;
 import com.dexmohq.dexml.XmlReader;
 import com.dexmohq.dexml.annotation.Implementations;
 import com.dexmohq.dexml.annotation.MappedTypeName;
 import com.dexmohq.dexml.annotation.Transient;
 import com.dexmohq.dexml.format.XmlContext;
-import com.dexmohq.dexml.util.StringUtils;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import org.w3c.dom.NamedNodeMap;
@@ -16,12 +14,9 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Arrays;
 
 public class Sandbox {
 

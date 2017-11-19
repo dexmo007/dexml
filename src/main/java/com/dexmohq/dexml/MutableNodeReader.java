@@ -2,6 +2,8 @@ package com.dexmohq.dexml;
 
 import com.dexmohq.dexml.annotation.Mutable;
 import com.dexmohq.dexml.annotation.Mutable.AccessorType;
+import com.dexmohq.dexml.exception.XmlConfigurationException;
+import com.dexmohq.dexml.exception.XmlParseException;
 import com.dexmohq.dexml.format.XmlContext;
 import com.dexmohq.dexml.util.Property;
 import org.w3c.dom.Node;

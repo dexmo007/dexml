@@ -3,11 +3,13 @@ package com.dexmohq.dexml.format;
 import com.dexmohq.dexml.*;
 import com.dexmohq.dexml.annotation.Immutable;
 import com.dexmohq.dexml.annotation.Mutable;
+import com.dexmohq.dexml.annotation.Ordering;
 import com.dexmohq.dexml.annotation.Transient;
-import com.dexmohq.dexml.util.ArrayUtils;
-import com.dexmohq.dexml.util.IndexedProperties;
-import com.dexmohq.dexml.util.Property;
-import com.dexmohq.dexml.util.StringUtils;
+import com.dexmohq.dexml.exception.XmlConfigurationException;
+import com.dexmohq.dexml.exception.XmlFormatException;
+import com.dexmohq.dexml.exception.XmlParseException;
+import com.dexmohq.dexml.util.*;
+import com.dexmohq.dexml.util.Properties;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 
@@ -47,7 +49,6 @@ import static com.dexmohq.dexml.util.ReflectUtils.isDerivedAnnotationPresent;
 public class XmlContext {
 
     private static final int INTERFACE_HIERARCHY_DISTANCE = Integer.MAX_VALUE - 1;
-    public static final Comparator<String> ALPHABETIC = String::compareTo;
 
     private final boolean climbHierarchy;
 
@@ -138,7 +139,7 @@ public class XmlContext {
 
     @SuppressWarnings("unchecked")
     public <T> XmlReads<T> computeAnnotatedReadsIfAbsent(Class<T> clazz) {
-        return (XmlReads<T>) readsMap.computeIfAbsent(clazz, AnnotatedValueReads::new);
+        return (XmlReads<T>) readsMap.computeIfAbsent(clazz, AnnotatedValueReads::create);
     }
 
     public <T> XmlFormat<T> computeAnnotatedFormatIfAbsent(Class<T> clazz) {
@@ -457,18 +458,24 @@ public class XmlContext {
      * @param type
      * @return
      */
-    public Map<String, Property> getProperties(Class<?> type) {//todo follow annotated ordering
+    public Properties getProperties(Class<?> type) {//todo follow annotated ordering
         final BeanInfo beanInfo;
         try {
             beanInfo = Introspector.getBeanInfo(type, Object.class);
         } catch (IntrospectionException e) {
             throw new XmlConfigurationException("Could not get bean info");
         }
-        final Map<String, Property> map;
-//        map = new TreeMap<>(ALPHABETIC); todo configurable
+        final Properties map;
+        final Ordering ordering = type.getAnnotation(Ordering.class);
+        if (ordering == null || !ordering.alphabetic() && ordering.customOrder().length == 0) {
+            map = new IndexedProperties();
+        } else if (ordering.customOrder().length == 0 && ordering.alphabetic()) {
+            map = new AlphabeticProperties();
+        } else {
+            map = new OrderedProperties(ordering.customOrder(), ordering.alphabetic() ?
+                    new AlphabeticProperties() : new IndexedProperties());
+        }
         final PropertyDescriptor[] propertyDescriptors = beanInfo.getPropertyDescriptors();
-        map = new IndexedProperties(propertyDescriptors.length);//todo by given order
-        int index = 0;
         for (PropertyDescriptor descriptor : propertyDescriptors) {//todo scan fields and allow node info to work with a field as well
             final Method getter = descriptor.getReadMethod();
             final Method setter = descriptor.getWriteMethod();
@@ -511,9 +518,7 @@ public class XmlContext {
                         }
                     }
                 }
-                if (map.put(descriptor.getName(), new Property(xmlName, descriptor, field, nodeType, index++)) != null) {
-                    throw new XmlConfigurationException("Duplicate names defined: " + descriptor.getName());
-                }
+                map.put(xmlName, descriptor, field, nodeType);
             }
         }
         return map;

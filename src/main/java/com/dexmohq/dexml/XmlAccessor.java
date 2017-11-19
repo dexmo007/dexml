@@ -1,13 +1,12 @@
 package com.dexmohq.dexml;
 
+import com.dexmohq.dexml.exception.XmlParseException;
 import com.dexmohq.dexml.util.ArrayUtils;
 import com.dexmohq.dexml.util.StringUtils;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
 
 public class XmlAccessor extends XmlMember {
     private final Method getter;

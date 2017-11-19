@@ -1,9 +1,14 @@
 package com.dexmohq.dexml.util;
 
+import com.dexmohq.dexml.exception.XmlConfigurationException;
+
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class IndexedProperties implements SortedMap<String, Property> {
+public class IndexedProperties implements Properties {
 
     private final ArrayList<Property> list;
 
@@ -30,55 +35,30 @@ public class IndexedProperties implements SortedMap<String, Property> {
     }
 
     @Override
-    public boolean containsKey(Object o) {
-        return list.stream().anyMatch(p -> p.getName().equals(o));
+    public boolean containsName(String name) {
+        return list.stream().anyMatch(p -> p.getName().equals(name));
     }
 
     @Override
-    public boolean containsValue(Object o) {
-        return list.contains(o);
+    public Property getByName(String name) {
+        return list.stream().filter(p -> p.getName().equals(name)).findFirst().orElse(null);
     }
 
     @Override
-    public Property get(Object o) {
-        return list.stream().filter(p -> p.getName().equals(o)).findFirst().orElse(null);
+    public Property getByIndex(int index) {
+        return list.get(index);
     }
 
     @Override
-    public Property put(String s, Property property) {
-        if (!s.equals(property.getName())) {
-            throw new IllegalArgumentException("Key does not equal the property's name");
+    public void put(String xmlName, PropertyDescriptor descriptor, Field field, short nodeType, int forceIndex) {
+        if (containsName(xmlName)) {
+            throw new XmlConfigurationException("Duplicate names: " + xmlName);
         }
-        if (list.stream().anyMatch(p -> p.getName().equals(s))) {
-            throw new IllegalArgumentException("Duplicate entries for name: " + s);
-        }
-        list.add(property);
-        return null;
+        list.add(new Property(xmlName, descriptor, field, nodeType, forceIndex));
     }
 
     @Override
-    public Property remove(Object o) {
-        return list.remove(o) ? (Property) o : null;
-    }
-
-    @Override
-    public void putAll(Map<? extends String, ? extends Property> map) {
-        for (java.util.Map.Entry<? extends String, ? extends Property> entry : map.entrySet()) {
-            this.put(entry.getKey(), entry.getValue());
-        }
-    }
-
-    @Override
-    public void clear() {
-        list.clear();
-    }
-
-    @Override
-    public Comparator<? super String> comparator() {
-        throw new UnsupportedOperationException();
-    }
-
-    private int indexOf(String name) {
+    public int indexOf(String name) {
         for (int i = 0; i < list.size(); i++) {
             if (list.get(i).getName().equals(name)) {
                 return i;
@@ -88,83 +68,17 @@ public class IndexedProperties implements SortedMap<String, Property> {
     }
 
     @Override
-    public SortedMap<String, Property> subMap(String s, String k1) {
-        final int start = indexOf(s);
-        final int end = indexOf(k1);
-        if (start == -1 || end == -1) {
-            throw new IllegalArgumentException();
-        }
-        return new IndexedProperties(list.subList(start, end + 1));
-    }
-
-    @Override
-    public SortedMap<String, Property> headMap(String s) {
-        final int end = indexOf(s);
-        if (end == -1) {
-            throw new IllegalArgumentException();
-        }
-        return new IndexedProperties(list.subList(0, end + 1));
-    }
-
-    @Override
-    public SortedMap<String, Property> tailMap(String s) {
-        final int start = indexOf(s);
-        if (start == -1) {
-            throw new IllegalArgumentException();
-        }
-        return new IndexedProperties(list.subList(start, list.size()));
-    }
-
-    @Override
-    public String firstKey() {
-        return list.get(0).getName();
-    }
-
-    @Override
-    public String lastKey() {
-        return list.get(list.size() - 1).getName();
-    }
-
-    @Override
-    public Set<String> keySet() {
+    public Set<String> names() {
         return list.stream().map(Property::getName).collect(Collectors.toSet());
     }
 
     @Override
-    public List<Property> values() {
-        return Collections.unmodifiableList(list);
+    public Iterator<Property> iterator() {
+        return list.iterator();
     }
 
     @Override
-    public Set<java.util.Map.Entry<String, Property>> entrySet() {
-        return list.stream().map(p -> new Entry(p.getName(), p)).collect(Collectors.toSet());
+    public Stream<Property> stream() {
+        return list.stream();
     }
-
-    private static class Entry implements java.util.Map.Entry<String, Property> {
-        private final String key;
-        private Property value;
-
-        public Entry(String key, Property value) {
-            this.key = key;
-            this.value = value;
-        }
-
-        @Override
-        public String getKey() {
-            return key;
-        }
-
-        @Override
-        public Property getValue() {
-            return value;
-        }
-
-        @Override
-        public Property setValue(Property property) {
-            final Property old = value;
-            value = property;
-            return old;
-        }
-    }
-
 }
