@@ -1,19 +1,16 @@
 package com.dexmohq.dexml;
 
-import com.dexmohq.dexml.format.XmlContext;
-import com.dexmohq.dexml.format.XmlFormat;
+import com.dexmohq.dexml.format.XmlWrites;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 public class AttributeWriter<T> implements NodeWriter<T> {
 
-    private final XmlFormat<T> format;
-    private final XmlContext context;
+    private final XmlWrites<T> writes;
 
-    public AttributeWriter(XmlFormat<T> format, XmlContext context) {
-        this.format = format;
-        this.context = context;
+    public AttributeWriter(XmlWrites<T> writes) {
+        this.writes = writes;
     }
 
     @Override
@@ -21,7 +18,7 @@ public class AttributeWriter<T> implements NodeWriter<T> {
         if (!(parent instanceof Element))
             throw new XmlConfigurationException("Attribute can only be child of an element");
 
-        ((Element) parent).setAttribute(context.toAttributeName(name), format.write(t));//todo configure if underscores
+        ((Element) parent).setAttribute(name, writes.write(t));//todo configure if underscores
     }
 
 

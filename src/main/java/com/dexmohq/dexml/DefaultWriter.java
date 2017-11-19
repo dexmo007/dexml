@@ -1,10 +1,7 @@
 package com.dexmohq.dexml;
 
-import com.dexmohq.dexml.annotation.WritesString;
 import com.dexmohq.dexml.format.XmlContext;
-import com.dexmohq.dexml.format.XmlWrites;
 import org.w3c.dom.Document;
-import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 public class DefaultWriter implements XmlWriter {
@@ -15,18 +12,22 @@ public class DefaultWriter implements XmlWriter {
         this.context = context;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public Node write(Object t) {
+    public Node write(Object object) {
         final Document document = context.newDocument();
-        if (t == null) {
+        if (object == null) {
             return document;
         }
-        final Class<?> type = t.getClass();
-        final Element element = document.createElement(context.toTagName(type.getSimpleName()));
-        if (type.isAnnotationPresent(WritesString.class)) {
-            final XmlWrites<?> writes = context.computeAnnotatedWritesIfAbsent(type);
-        }
-        return null;
+        final Class<?> type = object.getClass();
+        final NodeWriter nodeWriter = context.computeElementWriterIfAbsent(type);
+        nodeWriter.appendChild(document,document,context.toTagName(type.getSimpleName()), object);
+        return document;
+//        final Element element = document.createElement(context.toTagName(type.getSimpleName()));
+//        if (type.isAnnotationPresent(WritesString.class)) {
+//            final XmlWrites<?> writes = context.computeAnnotatedWritesIfAbsent(type);
+//        }
+//        return null;
     }
 
     @Override

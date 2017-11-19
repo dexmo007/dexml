@@ -3,7 +3,7 @@ package com.dexmohq.dexml.util;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class IndexedProperties implements Map<String, Property> {
+public class IndexedProperties implements SortedMap<String, Property> {
 
     private final ArrayList<Property> list;
 
@@ -13,6 +13,10 @@ public class IndexedProperties implements Map<String, Property> {
 
     public IndexedProperties() {
         this(16);
+    }
+
+    public IndexedProperties(List<Property> list) {
+        this.list = new ArrayList<>(list);
     }
 
     @Override
@@ -70,13 +74,65 @@ public class IndexedProperties implements Map<String, Property> {
     }
 
     @Override
+    public Comparator<? super String> comparator() {
+        throw new UnsupportedOperationException();
+    }
+
+    private int indexOf(String name) {
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    @Override
+    public SortedMap<String, Property> subMap(String s, String k1) {
+        final int start = indexOf(s);
+        final int end = indexOf(k1);
+        if (start == -1 || end == -1) {
+            throw new IllegalArgumentException();
+        }
+        return new IndexedProperties(list.subList(start, end + 1));
+    }
+
+    @Override
+    public SortedMap<String, Property> headMap(String s) {
+        final int end = indexOf(s);
+        if (end == -1) {
+            throw new IllegalArgumentException();
+        }
+        return new IndexedProperties(list.subList(0, end + 1));
+    }
+
+    @Override
+    public SortedMap<String, Property> tailMap(String s) {
+        final int start = indexOf(s);
+        if (start == -1) {
+            throw new IllegalArgumentException();
+        }
+        return new IndexedProperties(list.subList(start, list.size()));
+    }
+
+    @Override
+    public String firstKey() {
+        return list.get(0).getName();
+    }
+
+    @Override
+    public String lastKey() {
+        return list.get(list.size() - 1).getName();
+    }
+
+    @Override
     public Set<String> keySet() {
         return list.stream().map(Property::getName).collect(Collectors.toSet());
     }
 
     @Override
-    public Collection<Property> values() {
-        return new ArrayList<>(list);
+    public List<Property> values() {
+        return Collections.unmodifiableList(list);
     }
 
     @Override

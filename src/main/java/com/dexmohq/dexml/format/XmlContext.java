@@ -2,18 +2,19 @@ package com.dexmohq.dexml.format;
 
 import com.dexmohq.dexml.*;
 import com.dexmohq.dexml.annotation.Immutable;
+import com.dexmohq.dexml.annotation.Mutable;
 import com.dexmohq.dexml.annotation.Transient;
 import com.dexmohq.dexml.util.ArrayUtils;
 import com.dexmohq.dexml.util.IndexedProperties;
 import com.dexmohq.dexml.util.Property;
 import com.dexmohq.dexml.util.StringUtils;
-import com.google.common.collect.Sets;
-import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
-import org.w3c.dom.Text;
 
+import javax.xml.bind.annotation.XmlAttribute;
+import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlTransient;
+import javax.xml.bind.annotation.XmlValue;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -147,52 +148,61 @@ public class XmlContext {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> NodeWriter<T> computeElementParserIfAbsent(Class<T> type) {
+    public <T> NodeWriter<T> computeElementWriterIfAbsent(Class<T> type) {
         return (NodeWriter<T>) cache.computeIfAbsent(type, aClass -> new ElementWriter<>(type, this));
     }
 
     @SuppressWarnings("unchecked")
-    public <T> NodeReader<T> computeNodeReaderIfAbsent(Property.NodeType nodeType, Class<T> type) {
+    public <T> NodeReader<T> computeNodeReaderIfAbsent(short nodeType, Class<T> type) {
         switch (nodeType) {
-            case ATTRIBUTE:
-            case VALUE:
+            case Node.ATTRIBUTE_NODE:
+            case Node.TEXT_NODE:
                 final XmlReads<?> xmlReads = readsMap.get(type);
                 if (xmlReads == null) {
                     throw new XmlParseException("No reads found for type: " + type);
                 }
                 return node -> (T) xmlReads.read(node.getNodeValue());
-            case ELEMENT:
-            default:
+            case Node.ELEMENT_NODE:
                 return (NodeReader<T>) readerCache.computeIfAbsent(type,
                         this::newElementReader);
+            default:
+                throw new IllegalArgumentException("Node type (" + nodeType + ") not supported while reading");
 
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> NodeReader<T> computeElementReaderIfAbsent(Class<T> type) {
+        return (NodeReader<T>) readerCache.computeIfAbsent(type, this::newElementReader);
     }
 
     private <T> NodeReader<T> newElementReader(Class<T> type) {
         if (type.isAnnotationPresent(Immutable.class)) {
             return new ImmutableNodeReader<>(type, this);
         }
+        if (type.isAnnotationPresent(Mutable.class)) {
+            return MutableNodeReader.create(type, this);
+        }
 
         return new ImmutableNodeReader<>(type, this);//todo decide mutability
     }
 
-    /**
-     * If a format exists for the given type, an attribute parser is returned;
-     * otherwise an element parser is returned
-     *
-     * @param type class of the type to be parsed
-     * @param <T>  type to be parsed
-     * @return an attribute or element parser
-     */
-    public <T> NodeWriter<T> getArbitraryWriter(Class<T> type) {
-        final Optional<XmlFormat<T>> formatOptional = getFormatOptional(type);
-        if (formatOptional.isPresent()) {
-            final XmlFormat<T> format = formatOptional.get();
-            return new AttributeWriter<>(format, this);
-        }
-        return computeElementParserIfAbsent(type);
-    }
+//    /**
+//     * If a format exists for the given type, an attribute parser is returned;
+//     * otherwise an element parser is returned
+//     *
+//     * @param type class of the type to be parsed
+//     * @param <T>  type to be parsed
+//     * @return an attribute or element parser
+//     */
+//    public <T> NodeWriter<T> getArbitraryWriter(Class<T> type) {
+//        final Optional<XmlFormat<T>> formatOptional = getFormatOptional(type);
+//        if (formatOptional.isPresent()) {
+//            final XmlFormat<T> format = formatOptional.get();
+//            return new AttributeWriter<>(format, this);
+//        }
+//        return computeElementWriterIfAbsent(type);
+//    }
 
     /**
      * Registers writes to the given type
@@ -458,6 +468,7 @@ public class XmlContext {
 //        map = new TreeMap<>(ALPHABETIC); todo configurable
         final PropertyDescriptor[] propertyDescriptors = beanInfo.getPropertyDescriptors();
         map = new IndexedProperties(propertyDescriptors.length);//todo by given order
+        int index = 0;
         for (PropertyDescriptor descriptor : propertyDescriptors) {//todo scan fields and allow node info to work with a field as well
             final Method getter = descriptor.getReadMethod();
             final Method setter = descriptor.getWriteMethod();
@@ -470,12 +481,70 @@ public class XmlContext {
             // skip properties marked as transient
             if (!isTransient(getter, setter, field, field != null ? field.getAnnotations() : new Annotation[0])) {
                 //todo throw exception if also annotated with xml type
-                if (map.put(descriptor.getName(), new Property(descriptor, field)) != null) {
+                final String name = descriptor.getName();
+                Annotation xmlType = tryGetXmlType(getter.getAnnotations(), null, name);
+                if (setter != null)
+                    xmlType = tryGetXmlType(setter.getAnnotations(), xmlType, name);
+                if (field != null)
+                    xmlType = tryGetXmlType(field.getAnnotations(), xmlType, name);
+                final Class<?> propertyType = descriptor.getPropertyType();
+                final short nodeType;
+                final String xmlName;
+                if (xmlType == null) {
+                    if (writesMap.containsKey(propertyType)) {
+                        nodeType = Node.ATTRIBUTE_NODE;
+                        xmlName = toAttributeName(descriptor.getName());
+                    } else {
+                        nodeType = Node.ELEMENT_NODE;
+                        xmlName = toTagName(descriptor.getName());
+                    }
+                } else {
+                    if (xmlType.annotationType() == XmlValue.class) {
+                        nodeType = Node.TEXT_NODE;
+                        xmlName = VALUE_IDENTIFIER;
+                    } else {
+                        xmlName = extractName(xmlType, name);
+                        if (xmlType.annotationType() == XmlAttribute.class) {
+                            nodeType = Node.ATTRIBUTE_NODE;
+                        } else { // @XmlElement
+                            nodeType = Node.ELEMENT_NODE;
+                        }
+                    }
+                }
+                if (map.put(descriptor.getName(), new Property(xmlName, descriptor, field, nodeType, index++)) != null) {
                     throw new XmlConfigurationException("Duplicate names defined: " + descriptor.getName());
                 }
             }
         }
         return map;
+    }
+
+    private static final String DEFAULT_NAME_IDENTIFIER = "##default";
+    private static final String VALUE_IDENTIFIER = "#text";
+
+    private String extractName(Annotation a, String fieldName) {
+        if (a instanceof XmlAttribute) {
+            final String name = ((XmlAttribute) a).name();
+            return name.equals(DEFAULT_NAME_IDENTIFIER) ? toAttributeName(fieldName) : name;
+        } else {
+            final String name = ((XmlElement) a).name();
+            return name.equals(DEFAULT_NAME_IDENTIFIER) ? toTagName(fieldName) : name;
+        }
+    }
+
+    private static Annotation tryGetXmlType(Annotation[] annotations, Annotation previous, String name) {
+        for (Annotation a : annotations) {
+            final Class<? extends Annotation> annotationType = a.annotationType();
+            if (annotationType == XmlElement.class
+                    || annotationType == XmlAttribute.class
+                    || annotationType == XmlValue.class) {
+                if (previous != null) {
+                    throw new XmlConfigurationException("Ambiguous xml type annotations for property: " + name);
+                }
+                previous = a;
+            }
+        }
+        return previous;
     }
 
     public boolean isTransient(Method getter, Method setter, Field field, Annotation[] fieldAnnotations) {

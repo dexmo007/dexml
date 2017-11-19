@@ -118,7 +118,7 @@ public class Sandbox {
                     System.out.println(attributes.item(i).getNodeName());
                 }
                 final String type = attributes.getNamedItem(implementations.xmlMemberName()).getNodeValue();
-//                final NodeParser<? extends T> implParser = getContext().computeElementParserIfAbsent(mapping.get(type));
+//                final NodeParser<? extends T> implParser = getContext().computeElementWriterIfAbsent(mapping.get(type));
 //                implParser.appendChild(getContext().);
                 throw new InternalError("Found out the type is: " + type);
 //                return JAXB.unmarshal(StringUtils.nodeToString(root), mapping.get(type));

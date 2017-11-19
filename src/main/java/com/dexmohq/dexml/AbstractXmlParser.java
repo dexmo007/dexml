@@ -37,8 +37,8 @@ public abstract class AbstractXmlParser implements XmlParser {
         final Document document = documentBuilder.newDocument();
         final String name = StringUtils.transformCamelCase(type.getSimpleName(), "-");
 
-        final NodeParser parser = context.computeElementParserIfAbsent(type);
-        parser.appendChild(document, document, name, object);
+        final NodeWriter writer = context.computeElementWriterIfAbsent(type);
+        writer.appendChild(document, document, name, object);
         return document;
     }
 
